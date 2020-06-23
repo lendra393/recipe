@@ -1,0 +1,26 @@
+{
+  "name": "scraper",
+  "version": "1.0.0",
+  "description": "casperjs scripts to scrape across sites and join useful info",
+  "dependencies": {
+    "casperjs": "^1.1.4",
+    "episode-parser": "^1.2.0",
+    "lodash": "^4.5.0",
+    "simple-node-logger": "*",
+    "moment": "*",
+    "puppeteer": "3.0",
+    "argparse": "*"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/feltech/Scraper"
+  },
+  "keywords": [
+    "casperjs",
+    "dominos",
+    "rentals",
+    "imdb"
+  ],
+  "author": "David Feltell",
+  "license": "GPL-3.0"
+}

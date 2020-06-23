@@ -1,0 +1,137 @@
+#!/bin/bash
+# Go into this script's folder.
+cd "$(dirname `realpath $0`)"
+# In case things are stored in local, and we're running in cron.
+export PATH="$PATH:/usr/local/bin"
+# Number of weeks of movie charts to scrape.
+WEEKS=8
+# Minimum rating of movies.
+RATING=6
+# Number of eztv pages to scrape.
+EZTV=15
+# Email address to send failures to.
+EMAIL=""
+# Neocities username.
+USER=""
+# Neocities password.
+PASS=""
+# Whether to scrape movie rentals
+MOVIERENTALS=0
+# Whether to scrape tv shows
+TVSHOWS=0
+# casperjs executable
+CASPER=${CASPER:-casperjs}
+# Script path
+SCRAPER=${SCRAPER:-.}
+
+# Parse the command line options.
+
+PARSED=`getopt --options w:,r:,e:,m:,u:,p: --longoptions weeks:,rating:,eztv:,mail:,user:,pass: --name "$0" -- "$@"`
+if [[ $? -ne 0 ]]; then
+  exit 2
+fi
+# -- use eval with "$PARSED" to properly handle the quoting
+eval set -- "$PARSED"
+
+while true; do
+  case "$1" in
+    -w|--weeks)
+      WEEKS="$2"
+      shift 2
+    ;;
+    -r|--rating)
+      RATING="$2"
+      shift 2
+    ;;
+    -e|--eztv)
+      EZTV="$2"
+      shift 2
+    ;;
+    -m|--mail)
+      EMAIL="$2"
+      shift 2
+    ;;
+    -u|--user)
+      USER="$2"
+      shift 2
+    ;;
+    -p|--pass)
+      PASS="$2"
+      shift 2
+    ;;
+    --)
+      shift
+      break
+    ;;
+    *)
+      echo "Programming error"
+      exit 3
+    ;;
+  esac
+done
+
+if [ "$WEEKS" = "" -a "$RATING" != "" ]; then
+  echo "Must specify number of weeks if rating is specified (-w/--weeks)."
+  exit 4
+fi
+
+# -- handle non-option arguments
+case "$1" in
+    movies)
+      MOVIERENTALS=1
+      shift 2
+    ;;
+    tv)
+      TVSHOWS=1
+      shift 2
+    ;;
+    all)
+      MOVIERENTALS=1
+      TVSHOWS=1
+      shift 2
+    ;;
+    *)
+      echo "$0: unsupported scrape source '$1'. Must be 'movies', 'tv' or 'all'."
+      exit 4
+    ;;
+esac
+
+pushd "$SCRAPER"
+
+if [ $MOVIERENTALS -eq 1 ]; then
+
+  # Scrape rentals chart.
+  node --unhandled-rejections=strict rentals.puppeteer.js --weeks=$WEEKS --rating=$RATING
+
+  # Email if failure
+  if [ $? -ne 0 -a "$EMAIL" != "" ]; then
+    echo "Emailing failure to $EMAIL";
+    echo "Failed at $(date)" | mail -a "Message-ID:<scripts@telescuff>" -s "CasperJS rentals script failed" $EMAIL;
+
+  elif [ "$USER" != "" ]; then
+    echo "Uploading movierentals to Neocities";
+    curl -F "movierentals.html=@movierentals.html" "https://$USER:$PASS@neocities.org/api/upload"
+    echo "{\"lastModified\": \"$(date -Iseconds)\"}" > movieupdated.json
+    curl -F "moviesupdated.json=@movieupdated.json" "https://$USER:$PASS@neocities.org/api/upload"
+  fi
+fi
+
+if [ $TVSHOWS -eq 1 ]; then
+
+  # Scrape tv shows chart.
+  $CASPER --ignore-ssl-errors=true --ssl-protocol=any --output-encoding=utf8 tvshows.js $EZTV
+
+  # Email if failure
+  if [ $? -ne 0 -a "$EMAIL" != "" ]; then
+    echo "Emailing failure to $EMAIL";
+    echo "Failed at $(date)" | mail -a "Message-ID:<scripts@telescuff>" -s "CasperJS tvshows script failed" $EMAIL;
+
+  elif [ "$USER" != "" ]; then
+    echo "Uploading tvshows to Neocities";
+    curl -F "tvshows.html=@tvshows.html" "https://$USER:$PASS@neocities.org/api/upload"
+    echo "{\"lastModified\": \"$(date -Iseconds)\"}" > tvupdated.json
+    curl -F "tvupdated.json=@tvupdated.json" "https://$USER:$PASS@neocities.org/api/upload"
+  fi
+fi
+
+popd

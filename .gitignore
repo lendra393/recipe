@@ -1,0 +1,10 @@
+/node_modules/
+/scrape.js
+/.project
+/movierentals.html
+/tvshows.html
+/.pydevproject
+/.settings
+/.idea
+/package-lock.json
+/shows.json
